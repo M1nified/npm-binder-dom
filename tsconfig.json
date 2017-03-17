@@ -10,8 +10,11 @@
         "target": "es6"
     },
     "files": [
+        "typings/Exceptions.ts",
         "typings/ISettings.ts",
+        "typings/DataMatcher.ts",
+        "typings/Apply.ts",
         "typings/Binder.ts",
-        "typings/Apply.ts"
+        "typings/exports.ts"
     ]
 }

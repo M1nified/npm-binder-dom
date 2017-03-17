@@ -1,19 +1,38 @@
-class Binder {
+class BinderException {
+    get name() {
+        return this.constructor.name;
+    }
+    constructor(code, message) {
+        if (typeof code === "string") {
+            this.message = code;
+        }
+        else {
+            this.code = code;
+            this.message = message;
+        }
+    }
+    toString() {
+        return this.name + ", code: " + this.code + ". Message: \"" + this.message + "\"";
+    }
+}
+class ApplyElementNotSupportedBinderException extends BinderException {
+}
+class DataMatcher {
     constructor(settings) {
         this._settings = settings;
     }
     static getInstance(settings) {
-        if (!Binder._instance) {
+        if (!DataMatcher._instance) {
             if (typeof settings === 'undefined') {
                 return null;
             }
-            Binder._instance = new Binder(settings);
+            DataMatcher._instance = new DataMatcher(settings);
         }
-        return Binder._instance;
+        return DataMatcher._instance;
     }
     static clean() {
-        delete Binder._instance;
-        Binder._instance = undefined;
+        delete DataMatcher._instance;
+        DataMatcher._instance = undefined;
     }
     getValue(variableName) {
         let chain = variableName.split('.'), tail = this._settings.data;
@@ -45,8 +64,11 @@ class ApplyValue extends Apply {
         if (typeof this._settings.data[this._attrName] === 'undefined') {
             this._settings.data[this._attrName] = undefined;
         }
-        if (["input"].some(tag => { return element.tagName == tag; })) {
-            this._applyInput(element);
+        if (["input", "textarea"].some(tag => { return element.tagName == tag; })) {
+            this._applyInputTextarea(element);
+        }
+        else {
+            throw new ApplyElementNotSupportedBinderException(1);
         }
     }
     applySafe(element) {
@@ -57,9 +79,31 @@ class ApplyValue extends Apply {
             return false;
         }
     }
-    _applyInput(element) {
-        let value = Binder.getInstance().getValue(element.getAttribute(this._attrName));
+    _applyInputTextarea(element) {
+        let value = DataMatcher.getInstance().getValue(element.getAttribute(this._attrName));
         element.value = value === undefined ? '' : value;
     }
+}
+class ApplyChain {
+    static addApplyObject(applyObject) {
+        ApplyChain._applyObjects.push(applyObject);
+    }
+    static apply(element) {
+        ApplyChain._applyObjects.forEach(applyObject => {
+            applyObject.applySafe(element);
+        });
+    }
+}
+ApplyChain._applyObjects = [];
+class Binder {
+    constructor(data, settings) {
+        this._settings = Object.assign(Binder._defaultSettings, settings);
+        this._settings.data = settings.data;
+        ApplyChain.addApplyObject(new ApplyValue(this._settings));
+    }
+}
+Binder._defaultSettings = {};
+if (typeof exports !== 'undefined') {
+    exports.Binder = Binder;
 }
 //# sourceMappingURL=index.js.map
