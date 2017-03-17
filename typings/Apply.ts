@@ -10,20 +10,22 @@ class ApplyValue extends Apply {
   protected _attrName: string;
   constructor(settings: ISettings) {
     super(settings);
-    this._attrName = this._settings.data + "-value";
+    this._attrName = this._settings.data + this._settings.directives.value;
   }
   apply(element: Element) {
     if (typeof this._settings.data[this._attrName] === 'undefined') {
       this._settings.data[this._attrName] = undefined;
     }
-    if (["input", "textarea"].some(tag => { return element.tagName == tag; })) {
+    if (["input", "textarea"].some(tag => { return element.tagName == tag.toLowerCase(); })) {
       this._applyInputTextarea(<HTMLInputElement>element);
     } else {
       throw new ApplyElementNotSupportedBinderException(1);
     }
   }
   applySafe(element: Element) {
-    if (element.hasAttribute(this._attrName)) {
+    if (
+      element.hasAttribute(this._attrName) && ["input", "textarea"].some(tag => { return element.tagName == tag.toLowerCase(); })
+    ) {
       return this.apply(element);
     } else {
       return false;

@@ -1,10 +1,10 @@
 class DataMatcher {
   protected static _instance: DataMatcher;
-  protected _settings: ISettings;
-  protected constructor(settings: ISettings) {
+  protected _settings: BinderSettings;
+  protected constructor(settings: BinderSettings) {
     this._settings = settings;
   }
-  static getInstance(settings?: ISettings): DataMatcher {
+  static getInstance(settings?: BinderSettings): DataMatcher {
     if (!DataMatcher._instance) {
       if (typeof settings === 'undefined') {
         return null;
@@ -19,13 +19,13 @@ class DataMatcher {
   }
   getValue(variableName: string) {
     let chain = variableName.split('.'),
-      tail = this._settings.data;
+      tail = this._settings.settings.data;
     for (let i = 0; typeof tail === 'object' && i < chain.length; tail = tail[chain[i++]]);
     return tail;
   }
   setValue(variableName: string, value: any) {
     let chain = variableName.split('.'),
-      tail = this._settings.data,
+      tail = this._settings.settings.data,
       limit = chain.length - 1;
     for (let i = 0; i < limit; tail = tail[chain[i++]]) {
       if (typeof tail[chain[i]] !== 'object') {

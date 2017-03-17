@@ -19,16 +19,16 @@ describe('DataMatcher', () => {
         }
       }
     };
-    DataMatcher.getInstance(settings);
+    DataMatcher.getInstance(new BinderSettings(settings));
   });
 
   describe('getInstance', () => {
 
     it('should keep single instance', () => {
-      let DataMatcher1 = DataMatcher.getInstance(settings);
-      expect(DataMatcher1._settings.data.number).toBe(1);
+      let DataMatcher1 = DataMatcher.getInstance(new BinderSettings(settings));
+      expect(DataMatcher1._settings.settings.data.number).toBe(1);
       let DataMatcher2 = DataMatcher.getInstance();
-      expect(DataMatcher2._settings.data.number).toBe(1);
+      expect(DataMatcher2._settings.settings.data.number).toBe(1);
     });
 
   });
@@ -55,14 +55,14 @@ describe('DataMatcher', () => {
     it('should change existing element\'s value', () => {
       DataMatcher.getInstance().setValue("number", 2);
       expect(DataMatcher.getInstance().getValue("number")).toBe(2);
-      expect(DataMatcher.getInstance()._settings.data.number).toBe(2);
+      expect(DataMatcher.getInstance()._settings.settings.data.number).toBe(2);
       expect(settings.data.number).toBe(2);
     });
 
     it('should create non existing element and set its value', () => {
       DataMatcher.getInstance().setValue("object.newField.k1","value1");
       expect(DataMatcher.getInstance().getValue("object.newField.k1")).toBe("value1");
-      expect(DataMatcher.getInstance()._settings.data.object.newField.k1).toBe("value1");
+      expect(DataMatcher.getInstance()._settings.settings.data.object.newField.k1).toBe("value1");
       expect(settings.data.object.newField.k1).toBe("value1");
     });
 

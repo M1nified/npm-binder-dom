@@ -13,6 +13,10 @@
         "typings/Exceptions.ts",
         "typings/ISettings.ts",
         "typings/DataMatcher.ts",
+        "typings/Parser.ts",
+        "typings/Watchers/ValueWatcher.ts",
+        "typings/Watchers/ModelWatcher.ts",
+        "typings/Watchers/ElementWatcher.ts",
         "typings/Apply.ts",
         "typings/Binder.ts",
         "typings/exports.ts"
