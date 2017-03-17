@@ -1,0 +1,17 @@
+{
+    "compileOnSave":true,
+    "compilerOptions": {
+        "module": "none",
+        "noImplicitAny": true,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "outFile": "index.js",
+        "sourceMap": true,
+        "target": "es6"
+    },
+    "files": [
+        "typings/ISettings.ts",
+        "typings/Binder.ts",
+        "typings/Apply.ts"
+    ]
+}

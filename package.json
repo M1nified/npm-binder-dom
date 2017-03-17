@@ -1,0 +1,33 @@
+{
+  "name": "npm-binder-dom",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "karma start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/M1nified/npm-binder-dom.git"
+  },
+  "keywords": [
+    "bind"
+  ],
+  "author": "M1nified",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/M1nified/npm-binder-dom/issues"
+  },
+  "homepage": "https://github.com/M1nified/npm-binder-dom#readme",
+  "devDependencies": {
+    "jasmine": "^2.5.3",
+    "jasmine-core": "^2.5.2",
+    "karma": "^1.5.0",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-firefox-launcher": "^1.0.1",
+    "karma-fixture": "^0.2.6",
+    "karma-html2js-preprocessor": "^1.1.0",
+    "karma-jasmine": "^1.1.0",
+    "karma-json-fixtures-preprocessor": "0.0.6"
+  }
+}
