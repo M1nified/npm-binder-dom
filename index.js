@@ -1,3 +1,37 @@
+class BinderHash {
+    constructor() {
+        this._lastHash = null;
+        this._hashMap = {};
+        this._generator = this.hashCountGenerator();
+    }
+    get hashMap() {
+        return this._hashMap;
+    }
+    static getInstance() {
+        if (!BinderHash._instance) {
+            BinderHash._instance = new BinderHash();
+        }
+        return BinderHash._instance;
+    }
+    next() {
+        return "binderHash:" + this._generator.next().value;
+    }
+    linkNode(node, binderNode) {
+        let hash = this.next();
+        node.binderHash = hash;
+        this._hashMap[hash] = binderNode;
+    }
+    getBinderNode(node) {
+        if (typeof node !== "string" && node) {
+            node = node.binderHash;
+        }
+        return this._hashMap[node];
+    }
+    *hashCountGenerator() {
+        while (true)
+            yield ++this._lastHash;
+    }
+}
 class BinderException {
     get name() {
         return this.constructor.name;
@@ -17,13 +51,148 @@ class BinderException {
 }
 class ApplyElementNotSupportedBinderException extends BinderException {
 }
+class IncorrectExpressionBinderException extends BinderException {
+}
+class BinderNode {
+    get binderScope() {
+        return this._binderScope;
+    }
+    constructor(element, settings) {
+        this.element = element;
+        this._settings = settings;
+        this._binderScope = new BinderScope(this);
+        BinderHash.getInstance().linkNode(this.element, this);
+        console.log(this.element);
+    }
+    get parentBinderNode() {
+        return BinderHash.getInstance().getBinderNode(this.element.parentElement);
+    }
+    get childBinderNodes() {
+        let binderNodes = [], binderHash = BinderHash.getInstance(), childNodes = this.element.childNodes;
+        for (let i in childNodes) {
+            binderNodes.push(binderHash.getBinderNode(childNodes[i]));
+        }
+        return binderNodes;
+    }
+}
+class BinderElementNode extends BinderNode {
+    parse() {
+    }
+    updateTree() {
+        if ([
+            "script",
+            "text",
+            "#text",
+        ].some(type => Object.is(type, this.element.nodeName.toLowerCase()))) {
+            return;
+        }
+        this.parse();
+        for (let i = 0; i < this.element.childNodes.length; i++) {
+            if (this.element.childNodes[i].nodeType === Node.TEXT_NODE) {
+                let childTextNode = new BinderTextNode(this.element.childNodes[i], this._settings);
+                childTextNode.parse();
+                childTextNode.autoUpdateStart();
+            }
+            else {
+                let childBinderNode = new BinderElementNode(this.element.childNodes[i], this._settings);
+                childBinderNode.updateTree();
+            }
+        }
+    }
+}
+class BinderTextNode extends BinderNode {
+    constructor(element, settings) {
+        super(element, settings);
+        this._originalNodeValue = this.element.nodeValue;
+    }
+    parse() {
+        let tail = this._originalNodeValue, variable, variables = [];
+        while ((variable = /{{([^}]+)}}(.*)/ig.exec(tail)) !== null) {
+            variables.push(variable[1]);
+            tail = variable[2];
+        }
+        this._localVariablesNames = variables;
+    }
+    autoUpdateStart() {
+        this.updateBinds();
+    }
+    updateBinds() {
+        let value = this._originalNodeValue;
+        this._localVariablesNames.forEach(variableName => {
+            let regExEscapedVariableName = variableName.toString().replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, "\\$&");
+            let variableValue = this._binderScope.getVariableValueByName(variableName);
+            if (typeof variableValue !== "string") {
+                try {
+                    variableValue = variableValue.toString();
+                }
+                catch (ex) {
+                    variableValue = undefined;
+                }
+            }
+            value = value.replace(new RegExp(`\{\{${regExEscapedVariableName}\}\}`, 'g'), variableValue);
+        });
+        this.element.nodeValue = value;
+    }
+    updateTree() {
+    }
+}
+class BinderScope {
+    constructor(owner) {
+        this._variables = {};
+        this._owner = owner;
+    }
+    registerVariable(variableName) {
+    }
+    unregisterVariable(variableName) {
+        delete this._variables[variableName];
+    }
+    getParentBinderScope() {
+        let ownerParent = this._owner.parentBinderNode;
+        if (ownerParent) {
+            return ownerParent.binderScope;
+        }
+        return undefined;
+    }
+    getVariableByName(variableName) {
+        if (typeof this._variables[variableName] === "undefined") {
+            let parentScope = this.getParentBinderScope();
+            return parentScope
+                ? parentScope.getVariableByName(variableName)
+                : DataMatcher.getInstance().getAsBinderVariable(variableName);
+        }
+        else {
+            return this._variables[variableName];
+        }
+    }
+    getVariableValueByName(variableName) {
+        console.log("variableName", variableName);
+        let variable = this.getVariableByName(variableName);
+        console.log("variable", variable);
+        return variable.getValue();
+    }
+}
+class BinderVariable {
+    constructor(container, key) {
+        this._container = container;
+        this._key = key;
+    }
+    getValue() {
+        if (typeof this._container === 'object') {
+            return this._container[this._key];
+        }
+        return this._container;
+    }
+}
 class BinderSettings {
-    constructor(settings) {
+    constructor(settings, data) {
         this._settings = Object.assign(BinderSettings._defaultSettings, settings);
-        this._settings.data = settings.data;
+        this._settings.data = data;
     }
     get settings() {
         return this._settings;
+    }
+    get data() {
+        return this._settings.data;
     }
     getAttribute(directiveName) {
         return this._settings.prefix + this._settings.directives[directiveName];
@@ -63,6 +232,13 @@ class DataMatcher {
         for (let i = 0; typeof tail === 'object' && i < chain.length; tail = tail[chain[i++]])
             ;
         return tail;
+    }
+    getAsBinderVariable(variableName) {
+        let chain = variableName.split('.'), tail = this._settings.settings.data;
+        for (let i = 0; typeof tail === 'object' && i < chain.length - 1; tail = tail[chain[i++]])
+            ;
+        let variable = new BinderVariable(tail, chain[chain.length - 1]);
+        return variable;
     }
     setValue(variableName, value) {
         let chain = variableName.split('.'), tail = this._settings.settings.data, limit = chain.length - 1;
@@ -106,11 +282,36 @@ class ParserReal {
     }
 }
 class ParserRealRepeat extends ParserReal {
-    parse() {
+    parse(element) {
     }
 }
 class ParserRealValue extends ParserReal {
-    parse() {
+    parse(element) {
+    }
+}
+class AttrParser {
+    static parseRepeat(attrValue) {
+        let result;
+        if ((result = /([\S]*)?\s*(in|of|times)\s*(\[.*\]|[\S]*)/ig.exec(attrValue)) !== null) {
+            if ((!result[1] && result[2] !== 'times') || !result[2] || !result[3]) {
+                throw new IncorrectExpressionBinderException(1, "parseRepeat function failed");
+            }
+            let object = result[3], objectMatch;
+            if ((objectMatch = /\[.*\]/ig.exec(object)) !== null) {
+                try {
+                    object = JSON.parse(objectMatch[0]);
+                }
+                catch (jsonParserException) {
+                    throw new IncorrectExpressionBinderException(2, jsonParserException.message);
+                }
+            }
+            return {
+                variableName: result[1],
+                object,
+                iteration: result[2]
+            };
+        }
+        throw new IncorrectExpressionBinderException(0, "parseRepeat function failed");
     }
 }
 class ValueWatcher {
@@ -232,7 +433,7 @@ class Apply {
 class ApplyValue extends Apply {
     constructor(settings) {
         super(settings);
-        this._attrName = this._settings.data + this._settings.directives.value;
+        this._attrName = this._settings.data + this._settings.settings.directives.value;
     }
     apply(element) {
         if (typeof this._settings.data[this._attrName] === 'undefined') {
@@ -271,9 +472,12 @@ class ApplyChain {
 ApplyChain._applyObjects = [];
 class Binder {
     constructor(data, settings) {
-        this._settings = new BinderSettings(settings);
+        this._settings = new BinderSettings(settings, data);
+        DataMatcher.getInstance(this._settings);
         ApplyChain.addApplyObject(new ApplyValue(this._settings));
         let parser = new Parser(this._settings);
+        this._rootBinderNode = new BinderElementNode(document.getElementsByTagName('html')[0], this._settings);
+        this._rootBinderNode.updateTree();
     }
 }
 if (typeof exports !== 'undefined') {

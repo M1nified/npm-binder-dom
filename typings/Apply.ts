@@ -1,6 +1,6 @@
 abstract class Apply {
-  protected _settings: ISettings;
-  constructor(settings: ISettings) {
+  protected _settings: BinderSettings;
+  constructor(settings: BinderSettings) {
     this._settings = settings;
   }
   abstract apply(element: Element): void;
@@ -8,9 +8,9 @@ abstract class Apply {
 }
 class ApplyValue extends Apply {
   protected _attrName: string;
-  constructor(settings: ISettings) {
+  constructor(settings: BinderSettings) {
     super(settings);
-    this._attrName = this._settings.data + this._settings.directives.value;
+    this._attrName = this._settings.data + this._settings.settings.directives.value;
   }
   apply(element: Element) {
     if (typeof this._settings.data[this._attrName] === 'undefined') {

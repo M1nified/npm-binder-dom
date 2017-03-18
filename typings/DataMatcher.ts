@@ -23,6 +23,13 @@ class DataMatcher {
     for (let i = 0; typeof tail === 'object' && i < chain.length; tail = tail[chain[i++]]);
     return tail;
   }
+  getAsBinderVariable(variableName: string) {
+    let chain = variableName.split('.'),
+      tail = this._settings.settings.data;
+    for (let i = 0; typeof tail === 'object' && i < chain.length - 1; tail = tail[chain[i++]]);
+    let variable = new BinderVariable(tail, chain[chain.length - 1]);
+    return variable;
+  }
   setValue(variableName: string, value: any) {
     let chain = variableName.split('.'),
       tail = this._settings.settings.data,

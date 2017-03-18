@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Example 1</title>
+</head>
+
+<body>
+  <input type="number" data-binder-model="count">
+  <ul>
+    <li data-binder-repeat="times number">{{$index}} of {{number}} ({{count}})</li>
+  </ul>
+</body>
+
+<script src="../index.js"></script>
+<script>
+  var variables = {
+    count: 4,
+    number: 10
+  };
+  var binder = new Binder(variables);
+
+</script>
+
+</html>

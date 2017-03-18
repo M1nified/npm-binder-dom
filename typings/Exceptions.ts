@@ -1,7 +1,7 @@
 abstract class BinderException {
   code: number;
   message: string;
-  get name(){
+  get name() {
     return this.constructor.name;
   }
   constructor(code?: number | string, message?: string) {
@@ -17,4 +17,6 @@ abstract class BinderException {
   }
 }
 
-class ApplyElementNotSupportedBinderException extends BinderException {}
+class ApplyElementNotSupportedBinderException extends BinderException { }
+
+class IncorrectExpressionBinderException extends BinderException { }

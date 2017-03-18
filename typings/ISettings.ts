@@ -25,9 +25,13 @@ class BinderSettings {
     return this._settings;
   }
 
-  constructor(settings: ISettings) {
+  get data() {
+    return this._settings.data;
+  }
+
+  constructor(settings: ISettings, data: any) {
     this._settings = Object.assign(BinderSettings._defaultSettings, settings);
-    this._settings.data = settings.data;
+    this._settings.data = data;
   }
 
   getAttribute(directiveName: string): string {
