@@ -6,8 +6,14 @@ abstract class BinderNode {
 
   protected _binderHash: string;
   protected _binderScope: BinderScope;
-  protected _settings: BinderSettings;
+  protected _desiredVariables: any[];
   protected _originalNode: Node;
+  protected _settings: BinderSettings;
+  protected _uid: string;
+
+  get uid(): string {
+    return this._uid;
+  }
 
   get binderScope() {
     return this._binderScope;
@@ -19,6 +25,8 @@ abstract class BinderNode {
     this._settings = settings;
     this._binderScope = new BinderScope(this);
     this._binderHash = BinderHash.getInstance().linkNode(this.element, this);
+    this._uid = Array(1).fill(0).map(() => { return (Math.random() * 100 % 20).toString(20).slice(2); }).join('').toUpperCase();
+    // console.log(this.uid);
   }
 
   abstract parse(): void;
@@ -41,6 +49,7 @@ abstract class BinderNode {
 
   destroy() {
     this.element.parentElement.removeChild(this.element);
+    BinderWatcher.deleteNodeWatchers(this);
   }
 
   manipulate(toTheLeaf?: boolean) {
@@ -68,6 +77,11 @@ class BinderElementNode extends BinderNode {
       repeater.init(this, this._settings);
       this._manipulators.push(repeater);
       this.binderScope.registerVariable(new BinderVariable(null, null, 'test'));
+      if (typeof parsed.object === "string") {
+        BinderWatcher.watchBinderNode(this, parsed.object, () => {
+          this.manipulate(true);
+        }, 'repeater')
+      }
     }
   }
 
@@ -112,7 +126,7 @@ class BinderElementNode extends BinderNode {
 
 class BinderTextNode extends BinderNode {
   protected _binderRepeatIndex: number;
-  protected _localVariableNames: any[];
+  protected _desiredVariablesWatchers: ValueWatcher[] = [];
   protected _settings: BinderSettings;
 
   constructor(element: Node, settings: BinderSettings) {
@@ -128,7 +142,18 @@ class BinderTextNode extends BinderNode {
       variables.push(variable[1]);
       tail = variable[2];
     }
-    this._localVariableNames = variables;
+    this._desiredVariables = variables;
+    this._watchDesiredVariables();
+  }
+
+  _watchDesiredVariables() {
+    // TODO: prevent watcher replication
+    this._desiredVariables.forEach(variableName => {
+      BinderWatcher.watchBinderNode(this, variableName, () => {
+        console.log('change')
+        this.updateBinds();
+      }, variableName);
+    })
   }
 
   autoUpdateStart() {
@@ -137,7 +162,7 @@ class BinderTextNode extends BinderNode {
 
   updateBinds() {
     let value = this._originalNode.nodeValue;
-    this._localVariableNames.forEach(variableName => {
+    this._desiredVariables.forEach(variableName => {
       let regExEscapedVariableName = variableName.toString().replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, "\\$&");
       let variableValue = this._binderScope.getVariableValueByName(variableName);
       if (typeof variableValue !== "string") {
@@ -166,7 +191,7 @@ class BinderTextNode extends BinderNode {
     return copy;
   }
 
-  manipulate(){
+  manipulate() {
     this.updateBinds();
   }
 

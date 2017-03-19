@@ -119,6 +119,9 @@ class ApplyElementNotSupportedBinderException extends BinderException {
 class IncorrectExpressionBinderException extends BinderException {
 }
 class BinderNode {
+    get uid() {
+        return this._uid;
+    }
     get binderScope() {
         return this._binderScope;
     }
@@ -128,6 +131,7 @@ class BinderNode {
         this._settings = settings;
         this._binderScope = new BinderScope(this);
         this._binderHash = BinderHash.getInstance().linkNode(this.element, this);
+        this._uid = Array(1).fill(0).map(() => { return (Math.random() * 100 % 20).toString(20).slice(2); }).join('').toUpperCase();
     }
     get parentBinderNode() {
         return BinderHash.getInstance().getBinderNode(this.element.parentElement);
@@ -142,6 +146,7 @@ class BinderNode {
     }
     destroy() {
         this.element.parentElement.removeChild(this.element);
+        BinderWatcher.deleteNodeWatchers(this);
     }
     manipulate(toTheLeaf) {
     }
@@ -161,6 +166,11 @@ class BinderElementNode extends BinderNode {
             repeater.init(this, this._settings);
             this._manipulators.push(repeater);
             this.binderScope.registerVariable(new BinderVariable(null, null, 'test'));
+            if (typeof parsed.object === "string") {
+                BinderWatcher.watchBinderNode(this, parsed.object, () => {
+                    this.manipulate(true);
+                }, 'repeater');
+            }
         }
     }
     manipulate(toTheLeaf) {
@@ -200,6 +210,7 @@ class BinderElementNode extends BinderNode {
 class BinderTextNode extends BinderNode {
     constructor(element, settings) {
         super(element, settings);
+        this._desiredVariablesWatchers = [];
     }
     parse() {
         let tail = this._originalNode.nodeValue, variable, variables = [];
@@ -207,14 +218,23 @@ class BinderTextNode extends BinderNode {
             variables.push(variable[1]);
             tail = variable[2];
         }
-        this._localVariableNames = variables;
+        this._desiredVariables = variables;
+        this._watchDesiredVariables();
+    }
+    _watchDesiredVariables() {
+        this._desiredVariables.forEach(variableName => {
+            BinderWatcher.watchBinderNode(this, variableName, () => {
+                console.log('change');
+                this.updateBinds();
+            }, variableName);
+        });
     }
     autoUpdateStart() {
         this.updateBinds();
     }
     updateBinds() {
         let value = this._originalNode.nodeValue;
-        this._localVariableNames.forEach(variableName => {
+        this._desiredVariables.forEach(variableName => {
             let regExEscapedVariableName = variableName.toString().replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, "\\$&");
             let variableValue = this._binderScope.getVariableValueByName(variableName);
             if (typeof variableValue !== "string") {
@@ -435,6 +455,75 @@ class AttrParser {
             };
         }
         throw new IncorrectExpressionBinderException(0, "parseRepeat function failed");
+    }
+}
+class IBinderWatcher {
+}
+class BinderWatcher {
+    static watchBinderNode(binderNode, variableName, onChangeCallback, watcherName) {
+        let watcher = new BinderNodeWatcher();
+        watcher.binderNode = binderNode;
+        watcher.variableName = variableName;
+        watcher.callback = onChangeCallback;
+        if (watcherName) {
+            if (this._activeWatchers[binderNode.uid]) {
+                this._activeWatchers[binderNode.uid][watcherName] && this._activeWatchers[binderNode.uid][watcherName].stop();
+            }
+            else {
+                this._activeWatchers[binderNode.uid] || (this._activeWatchers[binderNode.uid] = {});
+            }
+            this._activeWatchers[binderNode.uid][watcherName] = watcher;
+        }
+        watcher.start();
+        BinderWatcher._binderNodeWatchers.push(watcher);
+    }
+    static deleteNodeWatchers(binderNode) {
+        if (this._activeWatchers[binderNode.uid]) {
+            for (let watcherName in this._activeWatchers[binderNode.uid]) {
+                this._activeWatchers[binderNode.uid][watcherName].stop();
+            }
+        }
+    }
+}
+BinderWatcher._binderNodeWatchers = [];
+BinderWatcher._activeWatchers = {};
+class BinderNodeWatcher extends IBinderWatcher {
+    constructor() {
+        super(...arguments);
+        this._shouldStop = false;
+    }
+    set binderNode(newValue) {
+        this._binderNode = newValue;
+    }
+    set callback(newValue) {
+        this._callback = newValue;
+    }
+    set variableName(newValue) {
+        this._variableName = newValue;
+    }
+    _getCurrentValue() {
+        return this._binderNode.binderScope.getVariableValueByName(this._variableName);
+    }
+    _loop() {
+        this._timeout = setTimeout(() => {
+            let currentValue = this._getCurrentValue();
+            if (!Object.is(currentValue, this._previousValue)) {
+                this._callback();
+                this._updatePreviousValue();
+            }
+            !this._shouldStop && this._loop();
+        }, 100);
+    }
+    start() {
+        this._updatePreviousValue();
+        this._loop();
+    }
+    stop() {
+        this._shouldStop = true;
+        clearTimeout(this._timeout);
+    }
+    _updatePreviousValue() {
+        this._previousValue = this._getCurrentValue();
     }
 }
 class ValueWatcher {

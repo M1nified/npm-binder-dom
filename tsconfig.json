@@ -19,6 +19,7 @@
         "typings/ISettings.ts",
         "typings/DataMatcher.ts",
         "typings/Parser.ts",
+        "typings/Watchers/BinderNodeWatcher.ts",
         "typings/Watchers/ValueWatcher.ts",
         "typings/Watchers/ModelWatcher.ts",
         "typings/Watchers/ElementWatcher.ts",
