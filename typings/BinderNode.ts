@@ -4,8 +4,10 @@ interface Node {
 abstract class BinderNode {
   element: Node;
 
+  protected _binderHash: string;
   protected _binderScope: BinderScope;
   protected _settings: BinderSettings;
+  protected _originalNode: Node;
 
   get binderScope() {
     return this._binderScope;
@@ -13,10 +15,10 @@ abstract class BinderNode {
 
   constructor(element: Node, settings: BinderSettings) {
     this.element = element;
+    this._originalNode = this.element.cloneNode(true);
     this._settings = settings;
     this._binderScope = new BinderScope(this);
-    BinderHash.getInstance().linkNode(this.element, this);
-    console.log(this.element)
+    this._binderHash = BinderHash.getInstance().linkNode(this.element, this);
   }
 
   abstract parse(): void;
@@ -30,11 +32,22 @@ abstract class BinderNode {
     let binderNodes: BinderNode[] = [],
       binderHash = BinderHash.getInstance(),
       childNodes = this.element.childNodes;
-    for (let i in childNodes) {
+    for (let i = 0; i < childNodes.length; i++) {
       binderNodes.push(binderHash.getBinderNode(childNodes[i]));
     }
+    binderNodes = binderNodes.filter(node => node);
     return binderNodes;
   }
+
+  destroy() {
+    this.element.parentElement.removeChild(this.element);
+  }
+
+  manipulate(toTheLeaf?: boolean) {
+
+  }
+
+  abstract replicateOriginal(): BinderNode;
 
 }
 class BinderElementNode extends BinderNode {
@@ -42,12 +55,27 @@ class BinderElementNode extends BinderNode {
   protected _binderLocalVariables: BinderVariable[];
   protected _binderRepeatIndex: number;
 
+  protected _isRepeating: boolean = true;
+  protected _manipulators: BinderManipulator[] = [];
+
+  isManipulable: boolean = true;
 
   parse() {
-    // if (this.element.hasAttribute(this._settings.attrRepeat)) {
-    //   let parsed = AttrParser.parseRepeat(this.element.getAttribute(this._settings.attrRepeat));
-    //   this._binderScope.registerVariable(parsed.variableName);
-    // }
+    if (this.isManipulable && this.element.attributes.getNamedItem(this._settings.attrRepeat)) {
+      let parsed = AttrParser.parseRepeat(this.element.attributes.getNamedItem(this._settings.attrRepeat).value);
+      this._isRepeating = true;
+      let repeater = BinderManipulatorRepeaterFactory.produce(parsed.iteration);
+      repeater.init(this, this._settings);
+      this._manipulators.push(repeater);
+      this.binderScope.registerVariable(new BinderVariable(null, null, 'test'));
+    }
+  }
+
+  manipulate(toTheLeaf?: boolean) {
+    if (this.isManipulable) {
+      this._manipulators.forEach(manipulator => manipulator.manipulate());
+    }
+    toTheLeaf && this.childBinderNodes.forEach(binderNode => binderNode.manipulate(true));
   }
 
   updateTree() {
@@ -61,10 +89,9 @@ class BinderElementNode extends BinderNode {
     this.parse();
     for (let i = 0; i < this.element.childNodes.length; i++) {
       if (this.element.childNodes[i].nodeType === Node.TEXT_NODE) {
-        // console.log(this.element.childNodes[i]);
         let childTextNode = new BinderTextNode(this.element.childNodes[i], this._settings);
         childTextNode.parse();
-        childTextNode.autoUpdateStart();
+        childTextNode.updateBinds();
       } else {
         let childBinderNode = new BinderElementNode(this.element.childNodes[i], this._settings);
         childBinderNode.updateTree();
@@ -72,29 +99,36 @@ class BinderElementNode extends BinderNode {
     }
   }
 
+  replicateOriginal(): BinderElementNode {
+    let elementClone = this._originalNode.cloneNode(true);
+    // let newBinderNodes = this.childBinderNodes.map(binderNode => binderNode.replicateOriginal());
+    // newBinderNodes.forEach(binderNode => elementClone.appendChild(binderNode.element))
+    let copy = new BinderElementNode(elementClone, this._settings);
+    copy.updateTree();
+    return copy;
+  }
+
 }
 
 class BinderTextNode extends BinderNode {
   protected _binderRepeatIndex: number;
-  protected _localVariablesNames: any[];
-  protected _originalNodeValue: string;
+  protected _localVariableNames: any[];
   protected _settings: BinderSettings;
 
   constructor(element: Node, settings: BinderSettings) {
     super(element, settings);
-    this._originalNodeValue = this.element.nodeValue;
   }
 
   parse() {
     let
-      tail = this._originalNodeValue,
+      tail = this._originalNode.nodeValue,
       variable,
       variables = [];
     while ((variable = /{{([^}]+)}}(.*)/ig.exec(tail)) !== null) {
       variables.push(variable[1]);
       tail = variable[2];
     }
-    this._localVariablesNames = variables;
+    this._localVariableNames = variables;
   }
 
   autoUpdateStart() {
@@ -102,8 +136,8 @@ class BinderTextNode extends BinderNode {
   }
 
   updateBinds() {
-    let value = this._originalNodeValue;
-    this._localVariablesNames.forEach(variableName => {
+    let value = this._originalNode.nodeValue;
+    this._localVariableNames.forEach(variableName => {
       let regExEscapedVariableName = variableName.toString().replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, "\\$&");
       let variableValue = this._binderScope.getVariableValueByName(variableName);
       if (typeof variableValue !== "string") {
@@ -119,7 +153,21 @@ class BinderTextNode extends BinderNode {
   }
 
   updateTree() {
+    this.updateBinds();
+  }
 
+  replicateOriginal(): BinderTextNode {
+    let elementClone = this._originalNode.cloneNode(true);
+    // let newBinderNodes = this.childBinderNodes.map(binderNode => binderNode.replicateOriginal());
+    // newBinderNodes.forEach(binderNode => elementClone.appendChild(binderNode.element))
+    let copy = new BinderTextNode(elementClone, this._settings);
+    copy.parse();
+    copy.updateBinds();
+    return copy;
+  }
+
+  manipulate(){
+    this.updateBinds();
   }
 
 }
@@ -130,33 +178,33 @@ class BinderScope {
   constructor(owner: BinderNode) {
     this._owner = owner;
   }
-  registerVariable(variableName: string) {
-
+  registerVariable(variable: BinderVariable) {
+    this._variables[variable.name] = variable;
   }
   unregisterVariable(variableName: string) {
     delete this._variables[variableName];
   }
-  getParentBinderScope(): BinderScope {
+  getParentScope(): BinderScope {
     let ownerParent = this._owner.parentBinderNode;
     if (ownerParent) {
       return ownerParent.binderScope
     }
     return undefined;
   }
-  getVariableByName(variableName: string): BinderVariable {
+  getVariableByName(variableName: string, calledFrom?: BinderScope): BinderVariable {
     if (typeof this._variables[variableName] === "undefined") {
-      let parentScope = this.getParentBinderScope();
+      let parentScope = this.getParentScope();
       return parentScope
-        ? parentScope.getVariableByName(variableName)
+        ? parentScope.getVariableByName(variableName, calledFrom)
         : DataMatcher.getInstance().getAsBinderVariable(variableName);
     } else {
+      if (BinderVariable.isReservedVariable(variableName)) {
+      }
       return this._variables[variableName];
     }
   }
   getVariableValueByName(variableName: string): any {
-    console.log("variableName", variableName)
     let variable = this.getVariableByName(variableName);
-    console.log("variable", variable)
     return variable.getValue();
   }
 }
@@ -165,17 +213,28 @@ class BinderVariable {
 
   protected _container: any;
   protected _key: number | string;
+  protected _name: string;
 
-  constructor(container: any, key: number | string) {
+  get name() {
+    return this._name;
+  }
+
+  constructor(container: any, key: number | string, name?: string) {
     this._container = container;
     this._key = key;
+    this._name = name;
   }
 
   getValue(): any {
-    if (typeof this._container === 'object') {
+    if (typeof this._container === 'object' && this._container) {
       return this._container[this._key];
     }
     return this._container;
   }
 
+  static isReservedVariable(variableName: string): boolean {
+    return [
+      "$index"
+    ].some(name => Object.is(name, variableName));
+  }
 }

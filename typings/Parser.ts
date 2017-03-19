@@ -60,7 +60,7 @@ class AttrParser {
       if ((!result[1] && result[2] !== 'times') || !result[2] || !result[3]) {
         throw new IncorrectExpressionBinderException(1, "parseRepeat function failed");
       }
-      let object = result[3],
+      let object: string | number = result[3],
         objectMatch;
       if ((objectMatch = /\[.*\]/ig.exec(object)) !== null) {
         try {
@@ -68,11 +68,16 @@ class AttrParser {
         } catch (jsonParserException) {
           throw new IncorrectExpressionBinderException(2, jsonParserException.message);
         }
+      } else {
+        let number = Number(object);
+        if (!isNaN(number)) {
+          object = number;
+        }
       }
       return {
         variableName: result[1],
-        object,
-        iteration: result[2]
+        iteration: result[2],
+        object: object
       };
     }
     throw new IncorrectExpressionBinderException(0, "parseRepeat function failed");

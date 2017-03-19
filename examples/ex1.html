@@ -6,17 +6,26 @@
 </head>
 
 <body>
-  <input type="number" data-binder-model="count">
+  <p>Some number: {{numbers.el1}}</p>
+  <p><input type="number" data-binder-model="count"></p>
   <ul>
-    <li data-binder-repeat="times number">{{$index}} of {{number}} ({{count}})</li>
+    <li data-binder-repeat="times count">{{$index}} of {{count}}</li>
   </ul>
+  <div data-binder-repeat="times 2">
+    <p>{{$index}}</p>
+    <ul>
+      <li data-binder-repeat="times 3">{{$index}} of {{count}}</li>
+    </ul>
+  </div>
 </body>
 
 <script src="../index.js"></script>
 <script>
   var variables = {
-    count: 4,
-    number: 10
+    count: 10,
+    numbers: {
+      el1: 10
+    }
   };
   var binder = new Binder(variables);
 

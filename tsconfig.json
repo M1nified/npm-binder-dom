@@ -10,7 +10,10 @@
         "target": "es6"
     },
     "files": [
+        "typings/BinderTools.ts",
         "typings/BinderHash.ts",
+        "typings/Manipulators/BinderManipulator.ts",
+        "typings/Manipulators/Repeater.ts",
         "typings/Exceptions.ts",
         "typings/BinderNode.ts",
         "typings/ISettings.ts",

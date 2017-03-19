@@ -15,6 +15,7 @@ class Binder {
 
     this._rootBinderNode = new BinderElementNode(document.getElementsByTagName('html')[0], this._settings);
     this._rootBinderNode.updateTree();
+    this._rootBinderNode.manipulate(true);
 
   }
 }

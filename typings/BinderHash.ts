@@ -28,6 +28,7 @@ class BinderHash {
     let hash = this.next();
     node.binderHash = hash;
     this._hashMap[hash] = binderNode;
+    return hash;
   }
 
   getBinderNode(node: Node | string): BinderNode {
